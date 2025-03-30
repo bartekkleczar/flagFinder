@@ -3,18 +3,21 @@ package com.example.flagfinder
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class CountryViewModel : ViewModel() {
-    private val _state = mutableStateOf(CountryState())
-    val state = _state
+    private val _state = MutableStateFlow(CountryState())
+    val state: StateFlow<CountryState> = _state.asStateFlow()
 
-    fun loadCountries(filter: CountryFilter = CountryFilter()) {
+    private fun loadCountries(filter: CountryFilter = CountryFilter()) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(
-                isLoading = true,
-                error = null
-            )
+            _state.update { it.copy(isLoading = true, error = null) }
 
             try {
                 val response = RetrofitInstance.api.filterCountries(
@@ -39,17 +42,43 @@ class CountryViewModel : ViewModel() {
                     otherSign = filter.otherSign,
                     noSigns = filter.noSigns
                 )
-                _state.value = _state.value.copy(
-                    countries = response,
-                    isLoading = false
-                )
+                _state.update {
+                    it.copy(
+                        countries = response,
+                        isLoading = false
+                    )
+                }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(
-                    error = e.message ?: "Unknown error",
-                    isLoading = false
-                )
+                _state.update {
+                    it.copy(
+                        error = e.message ?: "Unknown error",
+                        isLoading = false
+                    )
+                }
             }
         }
+    }
+
+    private val _filterState = MutableStateFlow(CountryFilter())
+    val filterState: StateFlow<CountryFilter> = _filterState.asStateFlow()
+
+    init {
+        observeFilters()
+    }
+
+    private fun observeFilters() {
+        viewModelScope.launch {
+            _filterState
+                .debounce(300)
+                .distinctUntilChanged()
+                .collect { filter ->
+                    loadCountries(filter)
+                }
+        }
+    }
+
+    fun updateFilter(newFilter: CountryFilter) {
+        _filterState.value = newFilter
     }
 }
 
