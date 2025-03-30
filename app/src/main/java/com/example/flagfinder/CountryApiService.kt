@@ -34,7 +34,7 @@ interface CountryApiService {
 }
 
 object RetrofitInstance {
-    private const val BASE_URL = "http://10.0.2.2:8080/" // Localhost dla emulatora
+    private const val BASE_URL = "http://10.0.2.2:8080/"
 
     private val client = OkHttpClient.Builder()
         .addInterceptor(HttpLoggingInterceptor().apply {
